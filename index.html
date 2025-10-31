@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Budget Terminal</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#FAFAF8"/>
+  <link rel="icon" href="icons/icon-192.png">
+  <link href="style.css" rel="stylesheet">
+</head>
+<body>
+  <div id="app">
+    <div id="main">
+      <nav class="tabs">
+        <div class="brand">BUDGET TERMINAL</div>
+        <span id="todayDate" class="today muted small"></span>
+        <div class="spacer"></div>
+        <button class="tab active" data-tab="quick">QUICK CHECK</button>
+        <button class="tab" data-tab="bills">BILLS</button>
+        <button class="tab" data-tab="help">HELP</button>
+      </nav>
+
+      <section id="tab-quick" class="tabpane active">
+        <div class="card">
+          <h2>QUICK CHECK</h2>
+          <div class="grid2">
+            <label>Current Balance
+              <div class="inputWrap"><input id="balance" inputmode="decimal" placeholder="0.00"></div>
+            </label>
+            <label>Bonus / Purchase (optional)
+              <div class="inputWrap"><input id="purchase" inputmode="decimal" placeholder="0.00"></div>
+            </label>
+          </div>
+          <div class="grid3 results">
+            <div><div class="muted">TOTAL UNPAID</div><div id="totalUnpaid" class="kpi">—</div></div>
+            <div><div class="muted">LEFT AFTER BILLS</div><div id="leftAfter" class="kpi">—</div></div>
+            <div><div class="muted">AFTER PURCHASE LEFT</div><div id="afterBuy" class="kpi">—</div></div>
+          </div>
+          <div class="actions">
+            <span id="coverageBadge" class="pill warning">WARNING</span>
+            <span id="buyBadge" class="pill warning">WARNING</span>
+          </div>
+          <div class="muted small cadence" id="cadenceLine"></div>
+          <div class="muted small" id="cadenceEarly"></div>
+          <div class="muted small" id="cadenceLate"></div>
+        </div>
+      </section>
+
+      <section id="tab-bills" class="tabpane">
+        <div class="card">
+          <h2>BILLS</h2>
+          <div class="row gap">
+            <button id="addBillBtn" class="btn">+ ADD BILL</button>
+            <button id="clearPaidBtn" class="btn ghost">CLEAR PAID</button>
+          </div>
+          <table id="billTable">
+            <thead>
+              <tr><th>BILL</th><th>DATE</th><th>AMOUNT</th><th>PAID</th><th></th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <div class="footer">Last Updated: <span id="lastUpdated"></span></div>
+        </div>
+      </section>
+
+      <section id="tab-help" class="tabpane">
+        <div class="card">
+          <h2>HELP</h2>
+          <p>Enter your current balance, unpaid bills, and optional purchase to see affordability.</p>
+          <p>Bills are auto-saved. Use the calendar field for real dates.</p>
+          <p>Split calculator shows your 50/30/20 plan based on your current balance.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <template id="billRowTpl">
+    <tr>
+      <td><input class="b-name"></td>
+      <td><input class="b-due" type="date"></td>
+      <td><input class="b-amt" inputmode="decimal"></td>
+      <td class="center"><input type="checkbox" class="b-paid"></td>
+      <td><button class="rowDel btn ghost">DELETE</button></td>
+    </tr>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
