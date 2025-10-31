@@ -1,64 +1,50 @@
-// app.js — Budget Terminal (light mode, overlay help, v3.4)
-
 (() => {
-  // ---------- small utils ----------
+  // ---------- utils ----------
   const $  = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-  const fmt = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const fmt0 = new Intl.NumberFormat('en-US');
+  const fmt = new Intl.NumberFormat('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
 
-  const debounce = (fn, ms = 300) => {
-    let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
-  };
+  const nowStamp = () => new Date().toLocaleString('en-US', {
+    weekday:'short', month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', second:'2-digit'
+  });
 
-  const setToday = () => {
+  // Show today's date in the header
+  (function setToday(){
     const el = $('#todayDate');
-    if (el) el.textContent = new Date().toLocaleDateString('en-US',
-      { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-  };
-
-  // Safe money read from <input>
-  const parseMoney = (el) => {
-    if (!el) return 0;
-    const raw = String(el.value ?? '').replace(/[^0-9.-]/g, '');
-    const n = parseFloat(raw);
-    return Number.isFinite(n) ? n : 0;
-  };
-
-  // read day-of-month from a <input type="date"> value
-  const dayFromISO = (iso) => {
-    if (!iso) return null;
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-    if (!m) return null;
-    const d = +m[3];
-    return Number.isFinite(d) ? d : null;
-  };
+    if (el) el.textContent = new Date().toLocaleDateString('en-US', {
+      weekday:'short', month:'short', day:'numeric', year:'numeric'
+    });
+  })();
 
   // ---------- tabs ----------
-  const panes = {
-    quick: $('#tab-quick'),
-    bills: $('#tab-bills')
-  };
+  const panes = { quick: $('#tab-quick'), bills: $('#tab-bills') };
   $$('.tab').forEach(btn => {
+    if (!btn.dataset.tab) return;
     btn.addEventListener('click', () => {
       $$('.tab').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      Object.values(panes).forEach(p => p?.classList.remove('active'));
+      Object.values(panes).forEach(p => p.classList.remove('active'));
       panes[btn.dataset.tab]?.classList.add('active');
-    }, { passive: true });
+    }, { passive:true });
   });
+
+  // ---------- overlay (help) ----------
+  const helpBtn = $('#helpBtn');
+  const helpOverlay = $('#helpOverlay');
+  const helpClose = $('#helpClose');
+  const hideHelp = () => helpOverlay.setAttribute('hidden','');
+  const showHelp = () => helpOverlay.removeAttribute('hidden');
+  helpBtn?.addEventListener('click', showHelp);
+  helpClose?.addEventListener('click', hideHelp);
+  helpOverlay?.addEventListener('click', (e) => { if (e.target === helpOverlay) hideHelp(); });
 
   // ---------- storage ----------
   const KEY = 'bt.bills.v2';
-  const loadBills = () => {
-    try { return JSON.parse(localStorage.getItem(KEY)) || []; }
-    catch { return []; }
-  };
-  const saveBillsRaw = (b) => localStorage.setItem(KEY, JSON.stringify(b));
-  const saveBillsDebounced = debounce(saveBillsRaw, 250);
+  const loadBills = () => { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } };
+  const saveBills = (b) => localStorage.setItem(KEY, JSON.stringify(b));
+  const updateTimestamp = () => $('#lastUpdated').textContent = nowStamp();
 
-  // ---------- elements ----------
-  // Quick Check
+  // ---------- elements (quick) ----------
   const balanceEl     = $('#balance');
   const purchaseEl    = $('#purchase');
   const totalUnpaidEl = $('#totalUnpaid');
@@ -67,205 +53,183 @@
   const coverageBadge = $('#coverageBadge');
   const buyBadge      = $('#buyBadge');
 
-  // 50/30/20 (accept old/new ids just in case)
-  const splitInput    = $('#splitIncome') || $('#splitInput');
-  const splitNeedsEl  = $('#splitNeeds');
-  const splitWantsEl  = $('#splitWants');
-  const splitSaveEl   = $('#splitSavings');
+  // 50/30/20
+  const splitIncomeEl  = $('#splitIncome');
+  const splitNeedsEl   = $('#splitNeeds');
+  const splitWantsEl   = $('#splitWants');
+  const splitSavingsEl = $('#splitSavings');
 
-  // Cadence display
+  // cadence
   const cadenceLine  = $('#cadenceLine');
   const cadenceEarly = $('#cadenceEarly');
   const cadenceLate  = $('#cadenceLate');
 
-  // Bills table
+  // bills table
   const tbody        = $('#billTable tbody');
   const addBillBtn   = $('#addBillBtn');
   const clearPaidBtn = $('#clearPaidBtn');
-  const resetBtn     = $('#resetAllBtn'); // optional “Reset All Data” button
+  const resetAllBtn  = $('#resetAllBtn');
+
+  // data
   let bills = loadBills();
 
-  // Help overlay
-  const helpBtn   = $('#helpBtn');
-  const helpClose = $('#helpClose');
-  const helpWrap  = $('#helpOverlay');
-
-  // ---------- UX niceties ----------
-  // select-on-focus for all inputs we control
-  const enableSelectOnFocus = () => {
-    $$('#billTable input, #balance, #purchase, #splitIncome, #splitInput').forEach(inp => {
-      inp.addEventListener('focus', e => e.target.select());
-    });
+  // ---------- helpers ----------
+  const parseMoney = (el) => {
+    const raw = (el?.value ?? '').toString().replace(/[^0-9.-]/g,'');
+    const v = parseFloat(raw);
+    return Number.isFinite(v) ? v : 0;
   };
 
-  // Show pill state
   const setBadge = (el, level) => {
-    if (!el) return;
-    el.classList.remove('success', 'warning', 'danger');
+    el.classList.remove('success','warning','danger');
     el.classList.add(level);
-    el.textContent = level[0].toUpperCase() + level.slice(1);
+    el.textContent = level[0].toUpperCase()+level.slice(1);
   };
 
-  // ---------- calculations ----------
+  const selectOnFocus = (input) => {
+    input.addEventListener('focus', () => input.select());
+    input.addEventListener('mouseup', (e) => e.preventDefault());
+  };
+
+  const debounce = (fn, ms=250) => {
+    let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+  };
+
+  // cadence: unpaid totals by 1st vs 15th using actual date field
   function updateCadence() {
     if (!cadenceEarly && !cadenceLate && !cadenceLine) return;
+    const byDay = bills.filter(b => !b.paid && b.date).map(b => {
+      const d = new Date(b.date);
+      return { day: d.getDate(), amount: +b.amount || 0 };
+    });
+    const early = byDay.filter(x => x.day <= 15).reduce((s,x)=>s+x.amount,0);
+    const late  = byDay.filter(x => x.day >  15).reduce((s,x)=>s+x.amount,0);
 
-    // unpaid totals by 1st vs 15th using day-of-month from ISO date
-    const byEarly = bills
-      .filter(b => !b.paid && (dayFromISO(b.date) ?? 31) <= 15)
-      .reduce((s, b) => s + (+b.amount || 0), 0);
-
-    const byLate = bills
-      .filter(b => !b.paid && (dayFromISO(b.date) ?? 31) > 15)
-      .reduce((s, b) => s + (+b.amount || 0), 0);
-
-    if (cadenceLine)  cadenceLine.textContent  = 'Bills grouped by pay period:';
-    if (cadenceEarly) cadenceEarly.textContent = `By 1st: $${fmt.format(byEarly)}`;
-    if (cadenceLate)  cadenceLate.textContent  = `By 15th: $${fmt.format(byLate)}`;
+    cadenceLine.textContent  = 'Bills grouped by pay period:';
+    cadenceEarly.textContent = `By 1st: $${fmt.format(early)}`;
+    cadenceLate.textContent  = `By 15th: $${fmt.format(late)}`;
   }
 
-  function calcQuick() {
-    const totalUnpaid = bills.reduce((s, b) => s + (!b.paid ? (+b.amount || 0) : 0), 0);
-    totalUnpaidEl && (totalUnpaidEl.textContent = fmt.format(totalUnpaid));
+  // KPIs
+  function calc() {
+    const totalUnpaid = bills.reduce((sum, b) => sum + (!b.paid ? (+b.amount || 0) : 0), 0);
+    totalUnpaidEl.textContent = fmt.format(totalUnpaid);
 
-    const bal   = parseMoney(balanceEl);
-    const buy   = parseMoney(purchaseEl);
-    const left  = bal - totalUnpaid;
+    const bal  = parseMoney(balanceEl);
+    const buy  = parseMoney(purchaseEl);
+    const left = bal - totalUnpaid;
     const after = left - buy;
 
-    leftAfterEl  && (leftAfterEl.textContent  = fmt.format(left));
-    afterBuyEl   && (afterBuyEl.textContent   = fmt.format(after));
+    leftAfterEl.textContent = fmt.format(left);
+    afterBuyEl.textContent  = fmt.format(after);
 
     setBadge(coverageBadge, left >= 0 ? 'success' : 'danger');
-    setBadge(buyBadge,      (left < 0) ? 'danger' : (after < 0 ? 'warning' : 'success'));
+    if (left < 0)       setBadge(buyBadge, 'danger');
+    else if (after < 0) setBadge(buyBadge, 'warning');
+    else                setBadge(buyBadge, 'success');
 
     updateCadence();
+    updateTimestamp();
   }
 
+  // 50/30/20 split
   function calcSplit() {
-    if (!splitInput || !splitNeedsEl || !splitWantsEl || !splitSaveEl) return;
-    const income = parseMoney(splitInput);
-    const needs  = income * 0.50;
-    const wants  = income * 0.30;
-    const save   = income * 0.20;
-    splitNeedsEl.textContent = fmt.format(needs);
-    splitWantsEl.textContent = fmt.format(wants);
-    splitSaveEl.textContent  = fmt.format(save);
+    const v = parseMoney(splitIncomeEl);
+    splitNeedsEl.textContent   = fmt.format(v * 0.50);
+    splitWantsEl.textContent   = fmt.format(v * 0.30);
+    splitSavingsEl.textContent = fmt.format(v * 0.20);
   }
 
   // ---------- bills table ----------
-  const bindRow = (tr, bill) => {
+  function bindRow(tr, bill) {
     const name = $('.b-name', tr);
-    const date = $('.b-date', tr);     // type="date"
+    const date = $('.b-date', tr);
     const amt  = $('.b-amt', tr);
     const paid = $('.b-paid', tr);
     const del  = $('.rowDel', tr);
 
-    // seed values
-    name.value   = bill.name   || '';
-    date.value   = bill.date   || '';             // ISO (yyyy-mm-dd)
-    amt.value    = bill.amount != null ? fmt.format(+bill.amount || 0) : '';
+    name.value = bill.name || '';
+    date.value = bill.date || '';
+    amt.value  = bill.amount != null ? bill.amount : '';
     paid.checked = !!bill.paid;
 
-    const push = () => {
+    // Select-on-focus UX
+    [name, date, amt].forEach(selectOnFocus);
+
+    const commit = debounce(() => {
       bill.name   = name.value.trim();
-      bill.date   = date.value || '';            // keep ISO or ''
+      bill.date   = date.value || '';
       bill.amount = parseMoney(amt);
       bill.paid   = !!paid.checked;
-      saveBillsDebounced(bills);
-      calcQuick();
-    };
+      saveBills(bills);
+      calc();
+    }, 200);
 
-    name.addEventListener('input',  push);
-    date.addEventListener('change', push);
-
-    // allow typing, but pretty-format on blur
-    amt.addEventListener('input',  debounce(() => { /* live save */ push(); }, 150));
-    amt.addEventListener('blur',   () => { amt.value = fmt.format(parseMoney(amt)); });
-
-    paid.addEventListener('change', push);
+    name.addEventListener('input', commit);
+    date.addEventListener('input', commit);
+    amt.addEventListener('input', commit);
+    paid.addEventListener('change', commit);
 
     del.addEventListener('click', () => {
-      if (!confirm(`Delete "${bill.name || 'bill'}"?`)) return;
+      if (!confirm(`Delete "${bill.name || 'this bill'}"?`)) return;
       bills = bills.filter(b => b !== bill);
-      saveBillsRaw(bills);
+      saveBills(bills);
       render();
-      calcQuick();
+      calc();
     });
-  };
+  }
 
   function render() {
-    if (!tbody) return;
     tbody.innerHTML = '';
     bills
-      .sort((a, b) => {
-        // sort by date (missing dates go last)
-        const da = a.date ? new Date(a.date).getTime() : Infinity;
-        const db = b.date ? new Date(b.date).getTime() : Infinity;
-        return da - db;
+      .sort((a,b) => {
+        // sort by date (blank -> bottom), then name
+        const da = a.date ? +new Date(a.date) : 9e15;
+        const db = b.date ? +new Date(b.date) : 9e15;
+        if (da !== db) return da - db;
+        return (a.name||'').localeCompare(b.name||'');
       })
       .forEach(bill => {
-        const row = document.importNode($('#billRowTpl').content, true).firstElementChild;
-        bindRow(row, bill);
-        tbody.appendChild(row);
+        const tr = document.importNode($('#billRowTpl').content, true).firstElementChild;
+        bindRow(tr, bill);
+        tbody.appendChild(tr);
       });
   }
 
-  // ---------- actions / buttons ----------
+  // ---------- actions ----------
   addBillBtn?.addEventListener('click', () => {
-    bills.push({ name: '', date: '', amount: 0, paid: false });
-    saveBillsRaw(bills);
+    bills.push({ name:'', date:'', amount:0, paid:false });
+    saveBills(bills);
     render();
-    calcQuick();
+    calc();
   });
 
   clearPaidBtn?.addEventListener('click', () => {
     bills.forEach(b => b.paid = false);
-    saveBillsRaw(bills);
+    saveBills(bills);
     render();
-    calcQuick();
+    calc();
   });
 
-  resetBtn?.addEventListener('click', () => {
-    if (!confirm('This will remove ALL bills and local totals. Continue?')) return;
+  resetAllBtn?.addEventListener('click', () => {
+    if (!confirm('Reset all data? This clears every bill and values.')) return;
     bills = [];
     localStorage.removeItem(KEY);
     render();
-    calcQuick();
+    calc();
   });
 
-  // Help overlay (light mode only; shows/hides correctly)
-  helpBtn?.addEventListener('click', () => {
-    helpWrap?.classList.add('show');
-  });
-  helpClose?.addEventListener('click', () => {
-    helpWrap?.classList.remove('show');
-  });
-  helpWrap?.addEventListener('click', (e) => {
-    if (e.target === helpWrap) helpWrap.classList.remove('show');
+  // quick inputs
+  [balanceEl, purchaseEl].forEach(el => {
+    if (!el) return;
+    selectOnFocus(el);
+    el.addEventListener('input', debounce(calc, 120));
   });
 
-  // ---------- inputs on quick tab ----------
-  balanceEl?.addEventListener('focus', e => e.target.select());
-  purchaseEl?.addEventListener('focus', e => e.target.select());
-  balanceEl?.addEventListener('input',  debounce(calcQuick, 120));
-  purchaseEl?.addEventListener('input', debounce(calcQuick, 120));
-
-  splitInput?.addEventListener('focus', e => e.target.select());
-  splitInput?.addEventListener('input', debounce(() => {
-    // keep the commas while user types by re-formatting on blur only
-    calcSplit();
-  }, 120));
-  splitInput?.addEventListener('blur', () => {
-    if (!splitInput) return;
-    splitInput.value = fmt.format(parseMoney(splitInput));
-    calcSplit();
-  });
+  splitIncomeEl?.addEventListener('input', debounce(calcSplit, 120));
 
   // ---------- init ----------
-  setToday();
-  enableSelectOnFocus();
   render();
-  calcQuick();
+  calc();
   calcSplit();
 })();
