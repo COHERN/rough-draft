@@ -1,50 +1,64 @@
-// Budget Terminal — stable build (light mode), with:
-// - robust null guards
-// - fixed bindings for bill name/date/amount/paid
-// - amount pretty-print on blur, raw while typing
-// - select-on-focus
-// - debounced saving
-// - delete confirmation
-// - safer sort for ISO date "DATE" column
+// app.js — Budget Terminal (light mode, overlay help, v3.4)
 
 (() => {
-  // ---------- utils ----------
-  const $  = (s, r=document) => r.querySelector(s);
-  const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+  // ---------- small utils ----------
+  const $  = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const fmt = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt0 = new Intl.NumberFormat('en-US');
 
+  const debounce = (fn, ms = 300) => {
+    let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+  };
+
+  const setToday = () => {
+    const el = $('#todayDate');
+    if (el) el.textContent = new Date().toLocaleDateString('en-US',
+      { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  // Safe money read from <input>
   const parseMoney = (el) => {
     if (!el) return 0;
     const raw = String(el.value ?? '').replace(/[^0-9.-]/g, '');
-    const v = parseFloat(raw);
-    return Number.isFinite(v) ? v : 0;
+    const n = parseFloat(raw);
+    return Number.isFinite(n) ? n : 0;
   };
-  const debounce = (fn, ms=300) => { let id; return (...a)=>{ clearTimeout(id); id=setTimeout(()=>fn(...a), ms); }; };
 
-  // Header date
-  function setToday(){
-    const el = $('#todayDate');
-    if (!el) return;
-    el.textContent = new Date().toLocaleDateString('en-US', {
-      weekday:'short', month:'short', day:'numeric', year:'numeric'
-    });
-  }
+  // read day-of-month from a <input type="date"> value
+  const dayFromISO = (iso) => {
+    if (!iso) return null;
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+    if (!m) return null;
+    const d = +m[3];
+    return Number.isFinite(d) ? d : null;
+  };
 
-  // ---------- storage ----------
-  const KEY = 'bt.bills.v3';
-  const loadBills = () => { try { return Array.isArray(JSON.parse(localStorage.getItem(KEY))) ? JSON.parse(localStorage.getItem(KEY)) : []; } catch { return []; } };
-  const saveBills = (bills) => localStorage.setItem(KEY, JSON.stringify(bills));
-  const updateTimestamp = () => { const t = $('#lastUpdated'); if (t) t.textContent = new Date().toLocaleString(); };
-
-  // ---------- select-on-focus ----------
-  document.addEventListener('focusin', e => {
-    if (e.target.matches('input[type="text"], input[type="number"], input[type="date"], .b-amt, #balance, #purchase, #incomeInput')) {
-      // Defer select slightly so iOS doesn’t fight it
-      setTimeout(() => { try { e.target.select(); } catch {} }, 0);
-    }
+  // ---------- tabs ----------
+  const panes = {
+    quick: $('#tab-quick'),
+    bills: $('#tab-bills')
+  };
+  $$('.tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      $$('.tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      Object.values(panes).forEach(p => p?.classList.remove('active'));
+      panes[btn.dataset.tab]?.classList.add('active');
+    }, { passive: true });
   });
 
+  // ---------- storage ----------
+  const KEY = 'bt.bills.v2';
+  const loadBills = () => {
+    try { return JSON.parse(localStorage.getItem(KEY)) || []; }
+    catch { return []; }
+  };
+  const saveBillsRaw = (b) => localStorage.setItem(KEY, JSON.stringify(b));
+  const saveBillsDebounced = debounce(saveBillsRaw, 250);
+
   // ---------- elements ----------
+  // Quick Check
   const balanceEl     = $('#balance');
   const purchaseEl    = $('#purchase');
   const totalUnpaidEl = $('#totalUnpaid');
@@ -53,162 +67,205 @@
   const coverageBadge = $('#coverageBadge');
   const buyBadge      = $('#buyBadge');
 
-  const incomeEl      = $('#incomeInput');
-  const needValEl     = $('#needVal');
-  const wantValEl     = $('#wantVal');
-  const saveValEl     = $('#saveVal');
+  // 50/30/20 (accept old/new ids just in case)
+  const splitInput    = $('#splitIncome') || $('#splitInput');
+  const splitNeedsEl  = $('#splitNeeds');
+  const splitWantsEl  = $('#splitWants');
+  const splitSaveEl   = $('#splitSavings');
 
-  const tbody         = $('#billTable tbody');
-  const rowTpl        = $('#billRowTpl');
+  // Cadence display
+  const cadenceLine  = $('#cadenceLine');
+  const cadenceEarly = $('#cadenceEarly');
+  const cadenceLate  = $('#cadenceLate');
 
-  // live data
-  const bills = loadBills();
+  // Bills table
+  const tbody        = $('#billTable tbody');
+  const addBillBtn   = $('#addBillBtn');
+  const clearPaidBtn = $('#clearPaidBtn');
+  const resetBtn     = $('#resetAllBtn'); // optional “Reset All Data” button
+  let bills = loadBills();
+
+  // Help overlay
+  const helpBtn   = $('#helpBtn');
+  const helpClose = $('#helpClose');
+  const helpWrap  = $('#helpOverlay');
+
+  // ---------- UX niceties ----------
+  // select-on-focus for all inputs we control
+  const enableSelectOnFocus = () => {
+    $$('#billTable input, #balance, #purchase, #splitIncome, #splitInput').forEach(inp => {
+      inp.addEventListener('focus', e => e.target.select());
+    });
+  };
+
+  // Show pill state
+  const setBadge = (el, level) => {
+    if (!el) return;
+    el.classList.remove('success', 'warning', 'danger');
+    el.classList.add(level);
+    el.textContent = level[0].toUpperCase() + level.slice(1);
+  };
 
   // ---------- calculations ----------
-  function calc() {
-    if (!totalUnpaidEl || !leftAfterEl || !afterBuyEl) return;
+  function updateCadence() {
+    if (!cadenceEarly && !cadenceLate && !cadenceLine) return;
 
-    const total = bills.reduce((sum, b) => sum + (!b.paid ? (+b.amount || 0) : 0), 0);
-    totalUnpaidEl.textContent = fmt.format(total);
+    // unpaid totals by 1st vs 15th using day-of-month from ISO date
+    const byEarly = bills
+      .filter(b => !b.paid && (dayFromISO(b.date) ?? 31) <= 15)
+      .reduce((s, b) => s + (+b.amount || 0), 0);
+
+    const byLate = bills
+      .filter(b => !b.paid && (dayFromISO(b.date) ?? 31) > 15)
+      .reduce((s, b) => s + (+b.amount || 0), 0);
+
+    if (cadenceLine)  cadenceLine.textContent  = 'Bills grouped by pay period:';
+    if (cadenceEarly) cadenceEarly.textContent = `By 1st: $${fmt.format(byEarly)}`;
+    if (cadenceLate)  cadenceLate.textContent  = `By 15th: $${fmt.format(byLate)}`;
+  }
+
+  function calcQuick() {
+    const totalUnpaid = bills.reduce((s, b) => s + (!b.paid ? (+b.amount || 0) : 0), 0);
+    totalUnpaidEl && (totalUnpaidEl.textContent = fmt.format(totalUnpaid));
 
     const bal   = parseMoney(balanceEl);
     const buy   = parseMoney(purchaseEl);
-    const left  = bal - total;
+    const left  = bal - totalUnpaid;
     const after = left - buy;
 
-    leftAfterEl.textContent = fmt.format(left);
-    afterBuyEl.textContent  = fmt.format(after);
+    leftAfterEl  && (leftAfterEl.textContent  = fmt.format(left));
+    afterBuyEl   && (afterBuyEl.textContent   = fmt.format(after));
 
-    if (coverageBadge) coverageBadge.textContent = left >= 0 ? 'Success' : 'Warning';
-    if (buyBadge)      buyBadge.textContent      = after >= 0 ? 'Success' : 'Warning';
+    setBadge(coverageBadge, left >= 0 ? 'success' : 'danger');
+    setBadge(buyBadge,      (left < 0) ? 'danger' : (after < 0 ? 'warning' : 'success'));
 
-    updateTimestamp();
+    updateCadence();
   }
 
-  // safe date sort: empty dates at bottom; otherwise ascending by actual date
-  function sortByDue(a, b) {
-    if (!a.due && !b.due) return 0;
-    if (!a.due) return 1;
-    if (!b.due) return -1;
-    const da = new Date(a.due).getTime();
-    const db = new Date(b.due).getTime();
-    if (!Number.isFinite(da) && !Number.isFinite(db)) return 0;
-    if (!Number.isFinite(da)) return 1;
-    if (!Number.isFinite(db)) return -1;
-    return da - db;
+  function calcSplit() {
+    if (!splitInput || !splitNeedsEl || !splitWantsEl || !splitSaveEl) return;
+    const income = parseMoney(splitInput);
+    const needs  = income * 0.50;
+    const wants  = income * 0.30;
+    const save   = income * 0.20;
+    splitNeedsEl.textContent = fmt.format(needs);
+    splitWantsEl.textContent = fmt.format(wants);
+    splitSaveEl.textContent  = fmt.format(save);
   }
 
-  // ---------- render bills ----------
-  function renderBills() {
-    if (!tbody || !rowTpl) return;
-    tbody.innerHTML = '';
+  // ---------- bills table ----------
+  const bindRow = (tr, bill) => {
+    const name = $('.b-name', tr);
+    const date = $('.b-date', tr);     // type="date"
+    const amt  = $('.b-amt', tr);
+    const paid = $('.b-paid', tr);
+    const del  = $('.rowDel', tr);
 
-    // sort by actual date if present
-    const view = [...bills].sort(sortByDue);
+    // seed values
+    name.value   = bill.name   || '';
+    date.value   = bill.date   || '';             // ISO (yyyy-mm-dd)
+    amt.value    = bill.amount != null ? fmt.format(+bill.amount || 0) : '';
+    paid.checked = !!bill.paid;
 
-    view.forEach((b, i) => {
-      const frag = rowTpl.content ? rowTpl.content.cloneNode(true) : rowTpl.cloneNode(true);
-      const row  = frag.firstElementChild || frag;
+    const push = () => {
+      bill.name   = name.value.trim();
+      bill.date   = date.value || '';            // keep ISO or ''
+      bill.amount = parseMoney(amt);
+      bill.paid   = !!paid.checked;
+      saveBillsDebounced(bills);
+      calcQuick();
+    };
 
-      const name = row.querySelector('.b-name');
-      const due  = row.querySelector('.b-due');     // should be type="date" in HTML
-      const amt  = row.querySelector('.b-amt');
-      const paid = row.querySelector('.b-paid');
-      const del  = row.querySelector('.rowDel');
+    name.addEventListener('input',  push);
+    date.addEventListener('change', push);
 
-      if (name) name.value = b.name || '';
-      if (due && b.due)    due.value = b.due;
-      if (amt)             amt.value = b.amount ? fmt.format(+b.amount) : '';
-      if (paid)            paid.checked = !!b.paid;
+    // allow typing, but pretty-format on blur
+    amt.addEventListener('input',  debounce(() => { /* live save */ push(); }, 150));
+    amt.addEventListener('blur',   () => { amt.value = fmt.format(parseMoney(amt)); });
 
-      // Bindings
-      if (name) name.addEventListener('input', debounce(() => {
-        b.name = name.value.trim();
-        saveBills(bills); updateTimestamp();
-      }, 200));
+    paid.addEventListener('change', push);
 
-      if (due) due.addEventListener('input', debounce(() => {
-        // store as ISO yyyy-mm-dd
-        b.due = due.value || '';
-        saveBills(bills); updateTimestamp();
-        // re-render to keep rows in date order after change
-        renderBills(); 
-      }, 200));
-
-      if (amt) {
-        amt.addEventListener('input', debounce(() => {
-          b.amount = parseMoney(amt);
-          saveBills(bills); calc();
-        }, 180));
-        amt.addEventListener('blur', () => {
-          amt.value = b.amount ? fmt.format(+b.amount) : '';
-        });
-      }
-
-      if (paid) paid.addEventListener('change', () => {
-        b.paid = !!paid.checked;
-        saveBills(bills); calc();
-      });
-
-      if (del) del.addEventListener('click', () => {
-        if (confirm(`Delete ${b.name || 'this bill'}?`)) {
-          // find actual index in bills (since view is sorted)
-          const idx = bills.indexOf(b);
-          if (idx > -1) bills.splice(idx, 1);
-          saveBills(bills);
-          renderBills(); calc();
-        }
-      });
-
-      tbody.appendChild(row);
+    del.addEventListener('click', () => {
+      if (!confirm(`Delete "${bill.name || 'bill'}"?`)) return;
+      bills = bills.filter(b => b !== bill);
+      saveBillsRaw(bills);
+      render();
+      calcQuick();
     });
+  };
+
+  function render() {
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    bills
+      .sort((a, b) => {
+        // sort by date (missing dates go last)
+        const da = a.date ? new Date(a.date).getTime() : Infinity;
+        const db = b.date ? new Date(b.date).getTime() : Infinity;
+        return da - db;
+      })
+      .forEach(bill => {
+        const row = document.importNode($('#billRowTpl').content, true).firstElementChild;
+        bindRow(row, bill);
+        tbody.appendChild(row);
+      });
   }
 
-  // ---------- actions ----------
-  const addBillBtn   = $('#addBillBtn');
-  const clearPaidBtn = $('#clearPaidBtn');
-
+  // ---------- actions / buttons ----------
   addBillBtn?.addEventListener('click', () => {
-    bills.push({ name:'', due:'', amount:0, paid:false });
-    saveBills(bills);
-    renderBills();
+    bills.push({ name: '', date: '', amount: 0, paid: false });
+    saveBillsRaw(bills);
+    render();
+    calcQuick();
   });
 
   clearPaidBtn?.addEventListener('click', () => {
-    if (!confirm('Clear all “PAID” checkboxes?')) return;
     bills.forEach(b => b.paid = false);
-    saveBills(bills);
-    renderBills(); calc();
+    saveBillsRaw(bills);
+    render();
+    calcQuick();
   });
 
-  // 50/30/20 split (always visible)
-  incomeEl?.addEventListener('input', () => {
-    const v = parseMoney(incomeEl);
-    if (needValEl) needValEl.textContent = fmt.format(v * 0.50);
-    if (wantValEl) wantValEl.textContent = fmt.format(v * 0.30);
-    if (saveValEl) saveValEl.textContent = fmt.format(v * 0.20);
+  resetBtn?.addEventListener('click', () => {
+    if (!confirm('This will remove ALL bills and local totals. Continue?')) return;
+    bills = [];
+    localStorage.removeItem(KEY);
+    render();
+    calcQuick();
   });
 
-  // Help overlay
-  const helpBtn     = $('#helpBtn');
-  const helpOverlay = $('#helpOverlay');
-  const helpClose   = $('#helpClose');
-
-  helpBtn?.addEventListener('click', () => { if (helpOverlay) helpOverlay.hidden = false; });
-  helpClose?.addEventListener('click', () => { if (helpOverlay) helpOverlay.hidden = true; });
-  helpOverlay?.addEventListener('click', (e) => {
-    if (e.target === helpOverlay) helpOverlay.hidden = true;
+  // Help overlay (light mode only; shows/hides correctly)
+  helpBtn?.addEventListener('click', () => {
+    helpWrap?.classList.add('show');
   });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && helpOverlay && !helpOverlay.hidden) helpOverlay.hidden = true;
+  helpClose?.addEventListener('click', () => {
+    helpWrap?.classList.remove('show');
+  });
+  helpWrap?.addEventListener('click', (e) => {
+    if (e.target === helpWrap) helpWrap.classList.remove('show');
   });
 
-  // ---------- recalc on input ----------
-  balanceEl?.addEventListener('input',  calc);
-  purchaseEl?.addEventListener('input', calc);
+  // ---------- inputs on quick tab ----------
+  balanceEl?.addEventListener('focus', e => e.target.select());
+  purchaseEl?.addEventListener('focus', e => e.target.select());
+  balanceEl?.addEventListener('input',  debounce(calcQuick, 120));
+  purchaseEl?.addEventListener('input', debounce(calcQuick, 120));
+
+  splitInput?.addEventListener('focus', e => e.target.select());
+  splitInput?.addEventListener('input', debounce(() => {
+    // keep the commas while user types by re-formatting on blur only
+    calcSplit();
+  }, 120));
+  splitInput?.addEventListener('blur', () => {
+    if (!splitInput) return;
+    splitInput.value = fmt.format(parseMoney(splitInput));
+    calcSplit();
+  });
 
   // ---------- init ----------
   setToday();
-  renderBills();
-  calc();
+  enableSelectOnFocus();
+  render();
+  calcQuick();
+  calcSplit();
 })();
