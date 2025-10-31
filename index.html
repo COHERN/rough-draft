@@ -52,4 +52,75 @@
         <span id="buyBadge" class="pill warning">WARNING</span>
       </div>
 
-      <div class="muted small
+      <div class="muted small cadence" id="cadenceLine"></div>
+      <div class="muted small" id="cadenceEarly"></div>
+      <div class="muted small" id="cadenceLate"></div>
+
+      <hr>
+
+      <h3>50/30/20 SPLIT</h3>
+      <label>ENTER INCOME AMOUNT
+        <input id="splitIncome" inputmode="decimal" placeholder="0.00">
+      </label>
+      <div class="kpis split">
+        <div><div class="muted">NEEDS (50%)</div><div id="splitNeeds"  class="kpi">0.00</div></div>
+        <div><div class="muted">WANTS (30%)</div><div id="splitWants"  class="kpi">0.00</div></div>
+        <div><div class="muted">SAVINGS (20%)</div><div id="splitSavings" class="kpi">0.00</div></div>
+      </div>
+
+      <div class="muted small" id="lastUpdatedWrap">Last updated: <span id="lastUpdated">—</span></div>
+    </section>
+
+    <!-- BILLS -->
+    <section id="tab-bills" class="tabpane card">
+      <h2>BILLS</h2>
+
+      <div class="row gap">
+        <button id="addBillBtn" class="btn">+ ADD BILL</button>
+        <button id="clearPaidBtn" class="btn ghost">CLEAR PAID</button>
+        <button id="resetAllBtn" class="btn ghost danger">RESET ALL DATA</button>
+      </div>
+
+      <table id="billTable" class="table">
+        <thead>
+          <tr>
+            <th>BILL</th>
+            <th>DATE</th>
+            <th>AMOUNT</th>
+            <th>PAID</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+  </main>
+
+  <!-- HELP OVERLAY -->
+  <div id="helpOverlay" class="overlay" hidden>
+    <div class="modal card">
+      <button id="helpClose" class="close" aria-label="Close">×</button>
+      <h2>HELP</h2>
+      <p><strong>Quick Check:</strong> Enter your bank balance and an optional purchase. We total unpaid bills and show how much remains, so you can sanity-check impulse buys.</p>
+      <p><strong>Bills:</strong> Add each bill, pick a <em>date</em>, enter amount, and tick PAID when done. “Bills grouped by pay period” updates automatically (1st vs 15th).</p>
+      <p><strong>50/30/20:</strong> Enter income to see classic split.</p>
+      <p><strong>Data:</strong> Stored locally in your browser. Use “RESET ALL DATA” for a clean slate.</p>
+      <p class="muted small">Tip: tap inside an input to auto-select its value.</p>
+    </div>
+  </div>
+
+  <!-- bill row template -->
+  <template id="billRowTpl">
+    <tr>
+      <td><input class="b-name" placeholder="Name"></td>
+      <td><input class="b-date" type="date"></td>
+      <td><input class="b-amt" inputmode="decimal" placeholder="0.00"></td>
+      <td class="center"><input type="checkbox" class="b-paid"></td>
+      <td class="right"><button class="rowDel btn ghost danger">DELETE</button></td>
+    </tr>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
