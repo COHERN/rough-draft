@@ -1,39 +1,36 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Budget Terminal</title>
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#F5EAD3"/>
-  <link rel="icon" href="icons/icon-192.png">
-  <link href="style.css" rel="stylesheet">
+  <link rel="icon" href="icon-192.png">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="app">
+    <!-- Top bar -->
     <nav class="tabs">
       <div class="brand">BUDGET TERMINAL</div>
-      <span id="todayDate" class="today muted small"></span>
+      <span id="todayDate" class="today muted"></span>
       <div class="spacer"></div>
       <button class="tab active" data-tab="quick">QUICK CHECK</button>
       <button class="tab" data-tab="bills">BILLS</button>
       <button id="helpBtn" class="tab ghost">HELP</button>
-      <button id="themeBtn" class="tab ghost" aria-pressed="false" title="Toggle theme">THEME</button>
     </nav>
 
     <!-- QUICK CHECK -->
     <section id="tab-quick" class="tabpane active">
-      <div class="card">
+      <div class="card outline">
         <h2>QUICK CHECK</h2>
 
-        <div class="grid2">
-          <label>CURRENT BALANCE
-            <div class="inputWrap"><input id="balance" inputmode="decimal" placeholder="0.00"></div>
-          </label>
-          <label>BONUS / PURCHASE (OPTIONAL)
-            <div class="inputWrap"><input id="purchase" inputmode="decimal" placeholder="0.00"></div>
-          </label>
-        </div>
+        <label class="block">Current Balance
+          <input id="balance" inputmode="decimal" placeholder="0.00">
+        </label>
+
+        <label class="block">Bonus / Purchase (optional)
+          <input id="purchase" inputmode="decimal" placeholder="0.00">
+        </label>
 
         <div class="grid3 results">
           <div>
@@ -55,73 +52,85 @@
           <span id="buyBadge" class="pill warning">WARNING</span>
         </div>
 
-        <!-- Cadence summary (auto-filled) -->
-        <div class="muted small cadence" id="cadenceLine"></div>
-        <div class="muted small" id="cadenceEarly"></div>
-        <div class="muted small" id="cadenceLate"></div>
+        <!-- Cadence summary -->
+        <div class="muted small cadence" id="cadenceLine">Bills grouped by pay period:</div>
+        <div class="muted small" id="cadenceEarly">By 1st: $0.00</div>
+        <div class="muted small" id="cadenceLate">By 15th: $0.00</div>
 
-        <!-- 50/30/20 split -->
-        <div class="split card-lite">
-          <h3>50/30/20 SPLIT</h3>
-          <label>ENTER INCOME AMOUNT
-            <div class="inputWrap"><input id="splitIncome" inputmode="decimal" placeholder="0.00"></div>
-          </label>
-          <div class="grid3 results smallcaps">
-            <div><div class="muted">NEEDS (50%)</div><div id="splitNeeds" class="kpi small">0.00</div></div>
-            <div><div class="muted">WANTS (30%)</div><div id="splitWants" class="kpi small">0.00</div></div>
-            <div><div class="muted">SAVINGS (20%)</div><div id="splitSave" class="kpi small">0.00</div></div>
+        <hr class="sep">
+
+        <!-- 50/30/20 SPLIT -->
+        <h3>50/30/20 SPLIT</h3>
+        <label class="block">Enter Income Amount
+          <input id="splitIncome" inputmode="decimal" placeholder="0.00">
+        </label>
+        <div class="grid3">
+          <div>
+            <div class="muted">NEEDS (50%)</div>
+            <div id="splitNeeds" class="kpi">0.00</div>
+          </div>
+          <div>
+            <div class="muted">WANTS (30%)</div>
+            <div id="splitWants" class="kpi">0.00</div>
+          </div>
+          <div>
+            <div class="muted">SAVINGS (20%)</div>
+            <div id="splitSavings" class="kpi">0.00</div>
           </div>
         </div>
 
-        <div class="footer-note">
-          <span id="lastUpdated">Last updated: —</span>
-        </div>
+        <div class="muted small lastline">Last updated: <span id="lastUpdated">—</span></div>
       </div>
     </section>
 
     <!-- BILLS -->
     <section id="tab-bills" class="tabpane">
-      <div class="card">
+      <div class="card outline">
         <h2>BILLS</h2>
         <div class="row gap">
           <button id="addBillBtn" class="btn">+ ADD BILL</button>
           <button id="clearPaidBtn" class="btn ghost">CLEAR PAID</button>
-          <button id="resetAllBtn" class="btn danger ghost">RESET ALL DATA</button>
+          <button id="resetBtn" class="btn danger ghost">RESET ALL DATA</button>
         </div>
 
-        <table id="billTable">
-          <thead>
-            <tr>
-              <th>BILL</th><th>DATE</th><th>AMOUNT</th><th>PAID</th><th></th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <div class="tableWrap">
+          <table id="billTable">
+            <thead>
+              <tr>
+                <th>BILL</th>
+                <th>DATE</th>
+                <th>AMOUNT</th>
+                <th>PAID</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
     </section>
   </div>
 
-  <!-- Help Modal -->
-  <div id="helpModal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="helpTitle">
-    <div class="modal__card">
-      <button id="helpClose" class="modal__close" aria-label="Close">×</button>
-      <h3 id="helpTitle">HELP</h3>
-      <p><strong>Quick Check</strong>: Enter your current bank balance and an optional purchase amount. The app totals unpaid bills and shows how much remains, so you can sanity-check impulse buys.</p>
-      <p><strong>Bills</strong>: Add each bill, pick a due <em>date</em>, enter the amount, and check “PAID” when done. Totals and cadence (by 1st vs by 15th) update automatically.</p>
-      <p><strong>50/30/20</strong>: Enter income to see the classic split allocation.</p>
-      <p><strong>Data</strong>: Everything saves locally in your browser. Use “RESET ALL DATA” if you need a clean slate.</p>
-      <p><strong>Theme</strong>: Use THEME to toggle light/dark. Graph-paper shows only in light mode.</p>
+  <!-- Help overlay -->
+  <div id="helpOverlay" class="overlay" hidden>
+    <div class="dialog">
+      <button id="helpClose" class="close">×</button>
+      <h2>HELP</h2>
+      <p><b>Quick Check:</b> Enter your current balance and an optional purchase. The app totals unpaid bills and shows how much remains.</p>
+      <p><b>Bills:</b> Add a bill, pick a <i>date</i>, enter the amount, check PAID when done. The cadence lines (by 1st vs by 15th) update automatically.</p>
+      <p><b>50/30/20:</b> Enter income to see the classic 50% / 30% / 20% split.</p>
+      <p><b>Data:</b> Everything is saved locally in your browser. Use <i>RESET ALL DATA</i> to clear.</p>
     </div>
   </div>
 
-  <!-- Bill row template -->
+  <!-- Row template -->
   <template id="billRowTpl">
     <tr>
       <td><input class="b-name" placeholder="Name"></td>
       <td><input class="b-date" type="date"></td>
-      <td><div class="inputWrap small"><input class="b-amt" inputmode="decimal" placeholder="0.00"></div></td>
-      <td class="center"><input type="checkbox" class="b-paid" aria-label="Paid"></td>
-      <td><button class="rowDel btn ghost danger">DELETE</button></td>
+      <td><input class="b-amt" inputmode="decimal" placeholder="0.00"></td>
+      <td class="center"><input type="checkbox" class="b-paid"></td>
+      <td class="right"><button class="rowDel btn ghost danger">DELETE</button></td>
     </tr>
   </template>
 
