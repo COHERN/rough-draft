@@ -1,13 +1,120 @@
-body{margin:0;font-family:ui-monospace,monospace;background:#FAFAF8;color:#111;}
-.tabs{display:flex;gap:8px;align-items:center;padding:12px 16px;max-width:1100px;margin:0 auto;}
-.brand{font-weight:700;}
-.spacer{flex:1;}
-.tab{background:transparent;border:1px solid #ccc;padding:10px 16px;border-radius:10px;cursor:pointer;}
-.tab.active{outline:2px solid #C9A227;}
-.card{background:#fff;border:1px solid #ccc;border-radius:8px;padding:16px;margin:16px auto;max-width:1100px;}
-.btn{border:1px solid #ccc;padding:8px 14px;border-radius:8px;cursor:pointer;}
-.btn.ghost{background:transparent;}
-input{width:100%;padding:8px;border:1px solid #ccc;border-radius:8px;}
-.kpi{font-size:20px;font-weight:800;}
-.footer{text-align:center;margin-top:12px;font-size:12px;color:#555;}
-.hidden{display:none;}
+:root{
+  /* LIGHT THEME */
+  --bg: #ffffff;
+  --ink: #0e0e0e;
+  --muted:#6b6b6b;
+  --outline:#0e0e0e;
+  --card:#ffffff;
+  --rule:#e5e5e5;
+  --pill-bg:#eef2e5;
+  --pill-bd:#c9d7b7;
+  --pill-ink:#1a3d22;
+  --warn-bg:#fff3d6;
+  --warn-bd:#ffd88a;
+  --warn-ink:#5b430e;
+  --danger:#b33939;
+}
+
+/* DARK THEME OVERRIDES */
+html[data-theme="dark"]{
+  --bg:#0e0e0e;
+  --ink:#ffffff;
+  --muted:#cfcfcf;
+  --outline:#ffffff;
+  --card:#0e0e0e;
+  --rule:#333333;
+  --pill-bg:#1e2b1f;
+  --pill-bd:#3a5b3f;
+  --pill-ink:#d1f0d8;
+  --warn-bg:#3a2e12;
+  --warn-bd:#6b531c;
+  --warn-ink:#ffe9b8;
+  --danger:#ff6b6b;
+}
+
+html,body{height:100%}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  color:var(--ink);
+  font:16px/1.4 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  background:var(--bg);
+}
+
+/* Header / Tabs */
+.tabs{
+  display:flex; align-items:center; gap:10px;
+  padding:12px 16px; position:sticky; top:0; z-index:3;
+  background:var(--bg);
+  border-bottom:4px solid var(--outline);
+}
+.brand{font-weight:900; letter-spacing:.06em}
+.today{margin-left:8px; color:var(--muted)}
+.spacer{flex:1}
+.tab{
+  cursor:pointer; padding:10px 14px; border-radius:8px;
+  background:transparent; border:2px solid var(--outline); color:var(--ink);
+}
+.tab.active{background:var(--ink); color:var(--bg)}
+.tab.ghost{background:transparent}
+
+/* “Page” with chunky outline (Draplin style) */
+.tabpane{
+  display:none; padding:24px;
+}
+.tabpane.active{display:block}
+.card{
+  max-width:1100px; margin:0 auto;
+  background:var(--card); color:var(--ink);
+  border:8px solid var(--outline); /* THICK outline */
+  border-radius:8px; padding:20px;
+}
+h2,h3{margin:.2em 0 12px; font-weight:900; letter-spacing:.06em}
+small,.small{font-size:12px}
+.muted{color:var(--muted)}
+.center{text-align:center}
+
+/* Layout grids */
+.grid1{display:grid; gap:12px}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+.grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px}
+@media (max-width:900px){ .grid2,.grid3{grid-template-columns:1fr} }
+
+.inputWrap input, .b-name, .b-amt, .b-date{
+  width:100%; border:2px solid var(--outline); background:var(--bg);
+  color:var(--ink); border-radius:8px; padding:10px 12px; font-size:16px;
+}
+.inputWrap input:focus, .b-name:focus, .b-amt:focus, .b-date:focus{
+  outline:3px solid var(--outline);
+}
+
+/* KPIs */
+.kpi{font-weight:900; font-size:22px}
+
+/* Pills / Buttons */
+.pill{
+  background:var(--pill-bg);
+  border:2px solid var(--pill-bd);
+  color:var(--pill-ink);
+  padding:8px 12px; border-radius:999px;
+}
+.pill.warning{background:var(--warn-bg); border-color:var(--warn-bd); color:var(--warn-ink)}
+.pill.danger{background:#ffe8e8; border-color:#f5b2b2; color:#7a1f1f}
+.actions{display:flex; gap:10px; margin:12px 0}
+
+.btn{
+  background:transparent; border:2px solid var(--outline); color:var(--ink);
+  padding:8px 12px; border-radius:8px; cursor:pointer;
+}
+.btn.ghost{opacity:.8}
+.btn.danger{border-color:var(--danger); color:var(--danger)}
+.btn:active{transform:translateY(1px)}
+
+/* Table */
+table{width:100%; border-collapse:collapse; margin-top:12px}
+th, td{border-bottom:2px solid var(--outline); padding:10px; text-align:left}
+th{font-weight:900; letter-spacing:.06em}
+
+/* Minor bits */
+.sep{border:none; border-top:2px dashed var(--outline); margin:16px 0}
+footer#foot{padding:12px 0 32px}
