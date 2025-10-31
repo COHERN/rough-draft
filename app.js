@@ -7,7 +7,23 @@
     const el=$('#todayDate');
     if(el) el.textContent=new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
   }
-
+  
+// THEME TOGGLE (light/dark) — add this block
+(function themeInit(){
+  const THEME_KEY = 'bt.theme';
+  const html = document.documentElement;
+  const btn  = document.getElementById('themeBtn');
+  const apply = (mode) => {
+    html.setAttribute('data-theme', mode);
+    localStorage.setItem(THEME_KEY, mode);
+    if (btn) btn.textContent = (mode === 'dark') ? 'LIGHT' : 'DARK';
+    if (btn) btn.setAttribute('aria-pressed', String(mode === 'dark'));
+  };
+  const saved = localStorage.getItem(THEME_KEY) || 'light';
+  apply(saved);
+  btn?.addEventListener('click', () => apply(html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'));
+})();
+  
   const KEY='bt.bills.v2';
   const loadBills=()=>{try{return JSON.parse(localStorage.getItem(KEY))||[]}catch{return[]}};
   const saveBills=b=>localStorage.setItem(KEY,JSON.stringify(b));
